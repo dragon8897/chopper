@@ -25,9 +25,10 @@
 
 [github.com/fyne-io/fyne](https://github.com/fyne-io/fyne)
 
-### 文件监听
+问题:
 
-[github.com/fsnotify/fsnotify](https://github.com/fsnotify/fsnotify)
+- 中文乱码:
+  - 使用 `os.Setenv()` 设置 `FYNE_FONT` 环境变量, 指向一个中文的 **TTF** 字体, 然后 `defer os.Unsetenv()`
 
 ## to-do list
 
@@ -35,7 +36,6 @@
   - [ ] 目标文件夹
   - [ ] git 配置项
 - [ ] 启动子进程
-  - [ ] 监听文件变动
   - [ ] 更改文件名
   - [ ] 上传 git (使用隐藏文件夹)
     - [ ] git pull
