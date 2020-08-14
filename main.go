@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/layout"
 	"fyne.io/fyne/theme"
 	"fyne.io/fyne/widget"
+	"github.com/dragon8897/chopper/extension"
 )
 
 const preferenceCurrentTab = "currentTab"
@@ -65,6 +66,16 @@ func welcomeScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 				}, win)
 				// fd.SetFilter(storage.NewExtensionFileFilter([]string{".png", ".txt"}))
 				fd.Show()
+			}),
+			widget.NewButton("open dir", func() {
+				extension.ShowDirSelect(func(dirPath string, err error) {
+					if err != nil {
+						dialog.ShowError(err, win)
+						return
+					}
+
+					fmt.Println("open dir:", dirPath)
+				}, win)
 			}),
 			layout.NewSpacer(),
 		),
