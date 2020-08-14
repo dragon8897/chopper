@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"os"
 
 	"fyne.io/fyne"
 	"fyne.io/fyne/app"
@@ -33,6 +34,27 @@ func shortcutFocused(s fyne.Shortcut, w fyne.Window) {
 	}
 }
 
+func makeFormTab() fyne.Widget {
+	name := widget.NewEntry()
+	name.SetPlaceHolder("John Smith")
+	password := widget.NewPasswordEntry()
+	password.SetPlaceHolder("Password")
+
+	form := &widget.Form{
+		Items: []*widget.FormItem{
+			{Text: "账号:", Widget: name},
+			{Text: "密码:", Widget: password},
+		},
+		OnCancel: func() {
+			fmt.Println("Cancelled")
+		},
+		OnSubmit: func() {
+			fmt.Println("Form submitted")
+		},
+	}
+	return form
+}
+
 func welcomeScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 	logo := canvas.NewImageFromResource(data.FyneScene)
 	if fyne.CurrentDevice().IsMobile() {
@@ -40,6 +62,12 @@ func welcomeScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 	} else {
 		logo.SetMinSize(fyne.NewSize(228, 167))
 	}
+
+	content := widget.NewEntry()
+	content.PlaceHolder = "请输入任务完成后机器人的发送内容"
+
+	robots := widget.NewSelect([]string{"机器人 1", "机器人 2", "机器人 3"}, func(s string) { fmt.Println("selected", s) })
+	robots.PlaceHolder = "请先选择一个群聊机器人"
 
 	return widget.NewVBox(
 		layout.NewSpacer(),
@@ -81,6 +109,18 @@ func welcomeScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 		),
 		layout.NewSpacer(),
 
+		widget.NewAccordionContainer(
+			widget.NewAccordionItem("Git 配置",
+				makeFormTab(),
+			),
+			widget.NewAccordionItem("机器人配置",
+				widget.NewVBox(
+					robots,
+					content,
+				),
+			),
+		),
+
 		widget.NewGroup("Theme",
 			fyne.NewContainerWithLayout(layout.NewGridLayout(2),
 				widget.NewButton("Dark", func() {
@@ -95,6 +135,8 @@ func welcomeScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 }
 
 func main() {
+	os.Setenv("FYNE_FONT", "/Library/Fonts/Arial Unicode.ttf")
+	defer os.Unsetenv("FYNE_FONT")
 	a := app.NewWithID("io.fyne.demo")
 	a.SetIcon(theme.FyneLogo())
 
