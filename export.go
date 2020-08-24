@@ -304,6 +304,7 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		dialog.NewError(err, win)
 	} else {
 		prog.Hide()
+		dialog.NewInformation("Info", "文件已重新命名:\n"+strings.Join(dstFiles, "\n"), win)
 	}
 
 }
