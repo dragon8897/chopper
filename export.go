@@ -1,15 +1,16 @@
 package main
 
 import (
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,6 +24,23 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/mozillazg/go-pinyin"
 )
+
+func hashFile(file string) string {
+	f, err := os.Open(file)
+	if err != nil {
+		log.Fatal(err)
+		return ""
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+		return ""
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
 
 func handle9Scale(file string, left int, top int, right int, bottom int) {
 	src, err := imaging.Open(file)
@@ -48,7 +66,49 @@ func handle9Scale(file string, left int, top int, right int, bottom int) {
 	}
 }
 
-func gitUpload(cfg ChopperCfg) error {
+func copyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if e := out.Close(); e != nil {
+			err = e
+		}
+	}()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return
+	}
+
+	err = out.Sync()
+	if err != nil {
+		return
+	}
+
+	si, err := os.Stat(src)
+	if err != nil {
+		return
+	}
+	err = os.Chmod(dst, si.Mode())
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func gitUpload(cfg ChopperCfg, files []string) error {
+	if len(files) == 0 {
+		return nil
+	}
 	if cfg.Git.Password == "" || cfg.Git.UserName == "" || cfg.Git.URL == "" {
 		return nil
 	}
@@ -95,18 +155,25 @@ func gitUpload(cfg ChopperCfg) error {
 	}
 	_ = w.Pull(&git.PullOptions{RemoteName: "origin"})
 
-	filename := filepath.Join(dir, "example-git-file")
-	err = ioutil.WriteFile(filename, []byte("hello world!"), 0644)
+	for _, f := range files {
+		_ = copyFile(path.Join(cfg.DirPath, f), path.Join(dir, f))
+	}
+
+	s, err := w.Status()
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Add("example-git-file")
+	if len(s) == 0 {
+		return nil
+	}
+
+	_, err = w.Add(".")
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Commit("example go-git commit", &git.CommitOptions{
+	_, err = w.Commit("update res", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "chopper",
 			Email: "chopper@didiapp.com",
@@ -158,76 +225,80 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		}
 	}
 
+	var dstFiles []string
 	regType := regexp.MustCompile(`^@.+_`)
 	reg9Scale := regexp.MustCompile(`#\([\d|,]+\)`)
 	for _, file := range files {
 		fileName := file.Name()
-		targetName := fileName
-
-		// 替换前缀类型: 按钮 -> btn; 背景 -> bg; 图标 -> icon; 预览 -> preview
-		loc := regType.FindStringIndex(targetName)
-		if len(loc) > 0 {
-			typeName := targetName[:loc[1]]
-			typeTag := ""
-			switch typeName {
-			case "@按钮_":
-				typeTag = "btn_"
-			case "@背景_":
-				typeTag = "bg_"
-			case "@图标_":
-				typeTag = "icon_"
-			case "@预览_":
-				typeTag = "preview_"
-			}
-			targetName = typeTag + targetName[loc[1]:]
-		}
-
-		// 处理九宫格图片
-		loc = reg9Scale.FindStringIndex(targetName)
-		if len(loc) > 0 {
-			// 去掉 @( )
-			scaleTag := targetName[loc[0]+2 : loc[1]-1]
-			scaleStrs := strings.Split(scaleTag, ",")
-			var scaleNums []int
-			for _, s := range scaleStrs {
-				num, err := strconv.Atoi(s)
-				if err == nil {
-					scaleNums = append(scaleNums, num)
-				}
-			}
-			var left, top, right, bottom int
-			if len(scaleNums) == 1 {
-				left, top, right, bottom = scaleNums[0], scaleNums[0], scaleNums[0], scaleNums[0]
-			} else if len(scaleNums) == 2 {
-				left, right = scaleNums[0], scaleNums[0]
-				top, bottom = scaleNums[1], scaleNums[1]
-			} else if len(scaleNums) == 3 {
-				left = scaleNums[0]
-				top, bottom = scaleNums[1], scaleNums[1]
-				right = scaleNums[2]
-			} else {
-				left = scaleNums[0]
-				top = scaleNums[1]
-				right = scaleNums[2]
-				bottom = scaleNums[3]
-			}
-			handle9Scale(path.Join(cfg.DirPath, fileName), left, top, right, bottom)
-			fileBytes := []byte(fileName)
-			targetName = string(append(fileBytes[:loc[0]], fileBytes[loc[1]:]...))
-		}
 		if strings.HasSuffix(fileName, ".png") || strings.HasSuffix(fileName, ".jpg") {
+			targetName := fileName
+
+			// 替换前缀类型: 按钮 -> btn; 背景 -> bg; 图标 -> icon; 预览 -> preview
+			loc := regType.FindStringIndex(targetName)
+			if len(loc) > 0 {
+				typeName := targetName[:loc[1]]
+				typeTag := ""
+				switch typeName {
+				case "@按钮_":
+					typeTag = "btn_"
+				case "@背景_":
+					typeTag = "bg_"
+				case "@图标_":
+					typeTag = "icon_"
+				case "@预览_":
+					typeTag = "preview_"
+				}
+				targetName = typeTag + targetName[loc[1]:]
+			}
+
+			// 处理九宫格图片
+			loc = reg9Scale.FindStringIndex(targetName)
+			if len(loc) > 0 {
+				// 去掉 @( )
+				scaleTag := targetName[loc[0]+2 : loc[1]-1]
+				scaleStrs := strings.Split(scaleTag, ",")
+				var scaleNums []int
+				for _, s := range scaleStrs {
+					num, err := strconv.Atoi(s)
+					if err == nil {
+						scaleNums = append(scaleNums, num)
+					}
+				}
+				var left, top, right, bottom int
+				if len(scaleNums) == 1 {
+					left, top, right, bottom = scaleNums[0], scaleNums[0], scaleNums[0], scaleNums[0]
+				} else if len(scaleNums) == 2 {
+					left, right = scaleNums[0], scaleNums[0]
+					top, bottom = scaleNums[1], scaleNums[1]
+				} else if len(scaleNums) == 3 {
+					left = scaleNums[0]
+					top, bottom = scaleNums[1], scaleNums[1]
+					right = scaleNums[2]
+				} else {
+					left = scaleNums[0]
+					top = scaleNums[1]
+					right = scaleNums[2]
+					bottom = scaleNums[3]
+				}
+				handle9Scale(path.Join(cfg.DirPath, fileName), left, top, right, bottom)
+				fileBytes := []byte(fileName)
+				targetName = string(append(fileBytes[:loc[0]], fileBytes[loc[1]:]...))
+			}
 			newName := strings.Join(pinyin.LazyPinyin(targetName, pyArgs), "")
 			if targetName == newName {
 				continue
 			}
-			err = os.Rename(path.Join(cfg.DirPath, fileName), path.Join(cfg.DirPath, newName))
+			dstFile := path.Join(cfg.DirPath, newName)
+			err = os.Rename(path.Join(cfg.DirPath, fileName), dstFile)
+			fmt.Println("hash ", hashFile(dstFile))
 			if err != nil {
 				fmt.Printf("rename error :%s\n", newName)
 			}
+			dstFiles = append(dstFiles, newName)
 		}
 	}
 
-	err = gitUpload(cfg)
+	err = gitUpload(cfg, dstFiles)
 	if err != nil {
 		prog.Hide()
 		dialog.NewError(err, win)
