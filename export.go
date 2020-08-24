@@ -9,13 +9,18 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"fyne.io/fyne"
 	"fyne.io/fyne/dialog"
 	"github.com/disintegration/imaging"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/mozillazg/go-pinyin"
 )
 
@@ -43,18 +48,83 @@ func handle9Scale(file string, left int, top int, right int, bottom int) {
 	}
 }
 
-func gitUpload(cfg ChopperCfg) {
+func gitUpload(cfg ChopperCfg) error {
 	if cfg.Git.Password == "" || cfg.Git.UserName == "" || cfg.Git.URL == "" {
-		return
+		return nil
 	}
 	dir := path.Join(cfg.DirPath, ".remote")
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		_, err := git.PlainClone(dir, false, &git.CloneOptions{
+			Auth: &http.BasicAuth{
+				Username: cfg.Git.UserName,
+				Password: cfg.Git.Password,
+			},
+			URL:      cfg.Git.URL,
+			Progress: os.Stdout,
+		})
+		if err != nil {
+			return err
+		}
+	}
 	d, err := os.Stat(dir)
 	if err != nil {
-		return
+		return err
 	}
 	if !d.IsDir() {
-		return
+		return err
 	}
+	r, err := git.PlainOpen(dir)
+	if err != nil {
+		return err
+	}
+	w, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+	ref, err := r.Head()
+	if err != nil {
+		return err
+	}
+	err = w.Reset(&git.ResetOptions{
+		Commit: ref.Hash(),
+		Mode:   git.HardReset,
+	})
+	if err != nil {
+		return err
+	}
+	_ = w.Pull(&git.PullOptions{RemoteName: "origin"})
+
+	filename := filepath.Join(dir, "example-git-file")
+	err = ioutil.WriteFile(filename, []byte("hello world!"), 0644)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Add("example-git-file")
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Commit("example go-git commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "chopper",
+			Email: "chopper@didiapp.com",
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = r.Push(&git.PushOptions{
+		Auth: &http.BasicAuth{
+			Username: cfg.Git.UserName,
+			Password: cfg.Git.Password,
+		},
+	})
+
+	return err
 }
 
 func export(cfg ChopperCfg, win fyne.Window) {
@@ -157,7 +227,12 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		}
 	}
 
-	gitUpload(cfg)
+	err = gitUpload(cfg)
+	if err != nil {
+		prog.Hide()
+		dialog.NewError(err, win)
+	} else {
+		prog.Hide()
+	}
 
-	prog.Hide()
 }
