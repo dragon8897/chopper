@@ -72,7 +72,7 @@ func createCfgUI(cfg *ChopperCfg, win fyne.Window) fyne.CanvasObject {
 		cfg.Robot.Content = text
 	}
 
-	robots := widget.NewSelect([]string{"机器人 1", "机器人 2", "机器人 3"}, func(name string) {
+	robots := widget.NewSelect([]string{"游戏开发"}, func(name string) {
 		cfg.Robot.Name = name
 	})
 	robots.PlaceHolder = "请先选择一个群聊机器人"

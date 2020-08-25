@@ -195,6 +195,10 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 }
 
 func export(cfg ChopperCfg, win fyne.Window) {
+	if cfg.DirPath == "" {
+		dialog.NewError(errors.New("目标文件夹没有配置"), win)
+		return
+	}
 	f, err := os.Stat(cfg.DirPath)
 	if err != nil {
 		dialog.NewError(err, win)
@@ -303,8 +307,16 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		prog.Hide()
 		dialog.NewError(err, win)
 	} else {
+		if err != nil {
+			log.Fatalln(err)
+		}
 		prog.Hide()
-		dialog.NewInformation("Info", "文件已重新命名:\n"+strings.Join(dstFiles, "\n"), win)
+		if len(dstFiles) > 0 {
+			_ = robot(cfg)
+			dialog.NewInformation("Info", "文件已重新命名:\n"+strings.Join(dstFiles, "\n"), win)
+		} else {
+			dialog.NewInformation("Info", "没有可命名的文件:\n", win)
+		}
 	}
 
 }
