@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type RobotMsg struct {
@@ -44,7 +45,7 @@ func robot(cfg ChopperCfg) error {
 		return nil
 	}
 
-	timeStamp := 1598340081000
+	timeStamp := time.Now().Unix() * 1000
 	signStr := fmt.Sprintf("%d\n%s", timeStamp, secret)
 	signSha256 := hmacSha256(secret, signStr)
 	signBase64 := base64Encode(signSha256)
