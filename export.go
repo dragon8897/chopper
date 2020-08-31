@@ -230,7 +230,7 @@ func export(cfg ChopperCfg, win fyne.Window) {
 	}
 
 	var dstFiles []string
-	regType := regexp.MustCompile(`^@.+-`)
+	regType := regexp.MustCompile(`^@.+?-`)
 	reg9Scale := regexp.MustCompile(`#\([\d|,]+\)`)
 	for _, file := range files {
 		fileName := file.Name()
@@ -310,15 +310,16 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		prog.Hide()
 		if len(dstFiles) > 0 {
 			err = robot(cfg)
+			prog.Hide()
 			if err != nil {
 				dialog.NewError(err, win)
 			} else {
 				dialog.NewInformation("Info", "文件已重新命名:\n"+strings.Join(dstFiles, "\n"), win)
 			}
 		} else {
+			prog.Hide()
 			dialog.NewInformation("Info", "没有可命名的文件:\n", win)
 		}
 	}
