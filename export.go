@@ -153,7 +153,16 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 	if err != nil {
 		return err
 	}
-	_ = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	err = w.Pull(&git.PullOptions{
+		RemoteName: "origin",
+		Auth: &http.BasicAuth{
+			Username: cfg.Git.UserName,
+			Password: cfg.Git.Password,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
 	for _, f := range files {
 		_ = copyFile(path.Join(cfg.DirPath, f), path.Join(dir, f))
