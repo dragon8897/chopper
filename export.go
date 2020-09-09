@@ -160,7 +160,9 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 			Password: cfg.Git.Password,
 		},
 	})
-	if err != nil {
+	if err == git.NoErrAlreadyUpToDate {
+		fmt.Println(err)
+	} else if err != nil {
 		return err
 	}
 

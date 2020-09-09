@@ -135,8 +135,15 @@ func createCfgUI(cfg *ChopperCfg, win fyne.Window) fyne.CanvasObject {
 		entryGitPwd,
 	}...)
 
+	btnStart := widget.NewButton("      开始      ", func() {
+		export(*cfg, win)
+	})
+
+	btnStart.Style = widget.PrimaryButton
+
 	return widget.NewVBox(
 		layout.NewSpacer(),
+		widget.NewGroup(" ", layout.NewSpacer()),
 		widget.NewHBox(
 			layout.NewSpacer(),
 			widget.NewButtonWithIcon("", theme.CancelIcon(), func() {
@@ -161,10 +168,9 @@ func createCfgUI(cfg *ChopperCfg, win fyne.Window) fyne.CanvasObject {
 		),
 		widget.NewHBox(
 			layout.NewSpacer(),
-			widget.NewButton("开始", func() {
-				export(*cfg, win)
-			}),
+			btnStart,
 		),
+		layout.NewSpacer(),
 	)
 }
 
