@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 
@@ -207,7 +206,6 @@ func main() {
 	a.SetIcon(theme.FyneLogo())
 
 	cfg := a.Preferences().String(preferenceChopperCfg)
-	fmt.Println("chopper cfg", cfg)
 	if len(cfg) > 0 {
 		err := json.Unmarshal([]byte(cfg), &allCfg)
 		if err != nil {

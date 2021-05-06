@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"image"
@@ -25,21 +24,32 @@ import (
 	"github.com/mozillazg/go-pinyin"
 )
 
-func hashFile(file string) string {
-	f, err := os.Open(file)
+func walkDir(dir string, base string) (files []string, err error) {
+	dirs, err := ioutil.ReadDir(dir)
 	if err != nil {
-		log.Fatal(err)
-		return ""
+		return nil, err
 	}
-	defer f.Close()
-
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		log.Fatal(err)
-		return ""
+	for _, file := range dirs {
+		name := file.Name()
+		if strings.HasPrefix(name, "__") {
+			continue
+		}
+		if strings.HasPrefix(name, ".remote") {
+			continue
+		}
+		filePath := path.Join(dir, name)
+		basePath := path.Join(base, name)
+		if file.IsDir() {
+			subFiles, err := walkDir(filePath, basePath)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, subFiles...)
+		} else {
+			files = append(files, basePath)
+		}
 	}
-
-	return fmt.Sprintf("%x", h.Sum(nil))
+	return files, nil
 }
 
 func handle9Scale(file string, left int, top int, right int, bottom int) {
@@ -73,6 +83,7 @@ func copyFile(src, dst string) (err error) {
 	}
 	defer in.Close()
 
+	_ = os.MkdirAll(path.Dir(dst), os.ModePerm)
 	out, err := os.Create(dst)
 	if err != nil {
 		return
@@ -105,12 +116,12 @@ func copyFile(src, dst string) (err error) {
 	return
 }
 
-func gitUpload(cfg ChopperCfg, files []string) error {
+func gitUpload(cfg ChopperCfg, files []string) (git.Status, error) {
 	if len(files) == 0 {
-		return nil
+		return nil, nil
 	}
 	if cfg.Git.Password == "" || cfg.Git.UserName == "" || cfg.Git.URL == "" {
-		return nil
+		return nil, nil
 	}
 	dir := path.Join(cfg.DirPath, ".remote")
 	_, err := os.Stat(dir)
@@ -124,34 +135,34 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 			Progress: os.Stdout,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	d, err := os.Stat(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !d.IsDir() {
-		return err
+		return nil, err
 	}
 	r, err := git.PlainOpen(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	w, err := r.Worktree()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ref, err := r.Head()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = w.Reset(&git.ResetOptions{
 		Commit: ref.Hash(),
 		Mode:   git.HardReset,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = w.Pull(&git.PullOptions{
 		RemoteName: "origin",
@@ -163,7 +174,7 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 	if err == git.NoErrAlreadyUpToDate {
 		fmt.Println(err)
 	} else if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, f := range files {
@@ -172,16 +183,16 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 
 	s, err := w.Status()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(s) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	_, err = w.Add(".")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = w.Commit("update res", &git.CommitOptions{
@@ -192,7 +203,7 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 		},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = r.Push(&git.PushOptions{
@@ -202,7 +213,11 @@ func gitUpload(cfg ChopperCfg, files []string) error {
 		},
 	})
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 func export(cfg ChopperCfg, win fyne.Window) {
@@ -222,7 +237,7 @@ func export(cfg ChopperCfg, win fyne.Window) {
 	prog := dialog.NewProgressInfinite("导出", "正在导出", win)
 	prog.Show()
 
-	files, err := ioutil.ReadDir(cfg.DirPath)
+	files, err := walkDir(cfg.DirPath, "")
 	if err != nil {
 		dialog.NewError(err, win)
 		return
@@ -244,7 +259,8 @@ func export(cfg ChopperCfg, win fyne.Window) {
 	regType := regexp.MustCompile(`^@.+?-`)
 	reg9Scale := regexp.MustCompile(`#\([\d|,]+\)`)
 	for _, file := range files {
-		fileName := file.Name()
+		fileName := path.Base(file)
+		fileDir := path.Dir(file)
 		if strings.HasSuffix(fileName, ".png") || strings.HasSuffix(fileName, ".jpg") {
 			targetName := fileName
 
@@ -300,20 +316,20 @@ func export(cfg ChopperCfg, win fyne.Window) {
 				targetName = string(append(fileBytes[:loc[0]], fileBytes[loc[1]:]...))
 			}
 			newName := strings.Join(pinyin.LazyPinyin(targetName, pyArgs), "")
-			if targetName == newName {
-				continue
-			}
-			dstFile := path.Join(cfg.DirPath, newName)
-			err = os.Rename(path.Join(cfg.DirPath, fileName), dstFile)
-			fmt.Println("hash ", hashFile(dstFile))
+			dstFile := path.Join(cfg.DirPath, fileDir, newName)
+			err = os.Rename(path.Join(cfg.DirPath, fileDir, fileName), dstFile)
 			if err != nil {
 				fmt.Printf("rename error :%s\n", newName)
 			}
-			dstFiles = append(dstFiles, newName)
+			dstFiles = append(dstFiles, path.Join(fileDir, newName))
 		}
 	}
 
-	err = gitUpload(cfg, dstFiles)
+	uploaded, err := gitUpload(cfg, dstFiles)
+	var upFiles string
+	for k := range uploaded {
+		upFiles += k + "\n"
+	}
 	if err != nil {
 		prog.Hide()
 		dialog.NewError(err, win)
@@ -321,17 +337,17 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if len(dstFiles) > 0 {
+		if len(uploaded) > 0 {
 			err = robot(cfg)
 			prog.Hide()
 			if err != nil {
 				dialog.NewError(err, win)
 			} else {
-				dialog.NewInformation("Info", "文件已重新命名:\n"+strings.Join(dstFiles, "\n"), win)
+				dialog.NewInformation("Info", "文件已更新上传:\n"+upFiles, win)
 			}
 		} else {
 			prog.Hide()
-			dialog.NewInformation("Info", "没有可命名的文件:\n", win)
+			dialog.NewInformation("Info", "没有可更新的文件!\n", win)
 		}
 	}
 
