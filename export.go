@@ -34,7 +34,7 @@ func walkDir(dir string, base string) (files []string, err error) {
 		if strings.HasPrefix(name, "__") {
 			continue
 		}
-		if strings.HasPrefix(name, ".remote") {
+		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		filePath := path.Join(dir, name)
@@ -322,6 +322,16 @@ func export(cfg ChopperCfg, win fyne.Window) {
 				fmt.Printf("rename error :%s\n", newName)
 			}
 			dstFiles = append(dstFiles, path.Join(fileDir, newName))
+		} else if strings.HasSuffix(fileName, ".mp3") || strings.HasSuffix(fileName, ".ogg") || strings.HasSuffix(fileName, ".m4a") {
+			newName := strings.Join(pinyin.LazyPinyin(fileName, pyArgs), "")
+			dstFile := path.Join(cfg.DirPath, fileDir, newName)
+			err = os.Rename(path.Join(cfg.DirPath, fileDir, fileName), dstFile)
+			if err != nil {
+				fmt.Printf("rename error :%s\n", newName)
+			}
+			dstFiles = append(dstFiles, path.Join(fileDir, newName))
+		} else {
+			dstFiles = append(dstFiles, path.Join(fileDir, fileName))
 		}
 	}
 
