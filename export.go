@@ -278,6 +278,8 @@ func export(cfg ChopperCfg, win fyne.Window) {
 					typeTag = "icon_"
 				case "@预览-":
 					typeTag = "preview_"
+				case "@动画-":
+					typeTag = "ani_"
 				}
 				targetName = typeTag + targetName[loc[1]:]
 			}
