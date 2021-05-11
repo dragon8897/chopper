@@ -15,8 +15,6 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-chopper
-
 # debug bin
 __debug_bin
 
