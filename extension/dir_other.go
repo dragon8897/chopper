@@ -1,4 +1,4 @@
-// +build !windows,!android,!ios
+// +build !android,!ios
 
 package extension
 

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"runtime"
 	"time"
 
 	"fyne.io/fyne"
@@ -200,8 +201,14 @@ func chopperScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 }
 
 func main() {
-	os.Setenv("FYNE_FONT", "/Library/Fonts/Arial Unicode.ttf")
-	defer os.Unsetenv("FYNE_FONT")
+	switch runtime.GOOS {
+	case "darwin":
+		os.Setenv("FYNE_FONT", "/Library/Fonts/Arial Unicode.ttf")
+		defer os.Unsetenv("FYNE_FONT")
+	case "windows":
+		os.Setenv("FYNE_FONT", "C:\\Windows\\Fonts\\STXINWEI.TTF")
+		defer os.Unsetenv("FYNE_FONT")
+	}
 	a := app.NewWithID("io.fyne.demo")
 	a.SetIcon(theme.FyneLogo())
 
