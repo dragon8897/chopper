@@ -131,8 +131,7 @@ func gitUpload(cfg ChopperCfg, files []string) (git.Status, error) {
 				Username: cfg.Git.UserName,
 				Password: cfg.Git.Password,
 			},
-			URL:      cfg.Git.URL,
-			Progress: os.Stdout,
+			URL: cfg.Git.URL,
 		})
 		if err != nil {
 			return nil, err
@@ -321,7 +320,7 @@ func export(cfg ChopperCfg, win fyne.Window) {
 			dstFile := path.Join(cfg.DirPath, fileDir, newName)
 			err = os.Rename(path.Join(cfg.DirPath, fileDir, fileName), dstFile)
 			if err != nil {
-				fmt.Printf("rename error :%s\n", newName)
+				log.Printf("rename error :%s\n", newName)
 			}
 			dstFiles = append(dstFiles, path.Join(fileDir, newName))
 		} else if strings.HasSuffix(fileName, ".mp3") || strings.HasSuffix(fileName, ".ogg") || strings.HasSuffix(fileName, ".m4a") {
@@ -329,7 +328,7 @@ func export(cfg ChopperCfg, win fyne.Window) {
 			dstFile := path.Join(cfg.DirPath, fileDir, newName)
 			err = os.Rename(path.Join(cfg.DirPath, fileDir, fileName), dstFile)
 			if err != nil {
-				fmt.Printf("rename error :%s\n", newName)
+				log.Printf("rename error :%s\n", newName)
 			}
 			dstFiles = append(dstFiles, path.Join(fileDir, newName))
 		} else {
@@ -346,9 +345,6 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		prog.Hide()
 		dialog.NewError(err, win)
 	} else {
-		if err != nil {
-			log.Fatalln(err)
-		}
 		if len(uploaded) > 0 {
 			err = robot(cfg)
 			prog.Hide()
