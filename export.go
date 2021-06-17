@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"strconv"
@@ -22,6 +23,10 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/mozillazg/go-pinyin"
+)
+
+var (
+	ErrorNotFoundImageOptim = errors.New("没有找到压缩工具")
 )
 
 func walkDir(dir string, base string) (files []string, err error) {
@@ -114,6 +119,36 @@ func copyFile(src, dst string) (err error) {
 	}
 
 	return
+}
+
+func execute(name string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func compressImage(image string) error {
+	stat, err := os.Stat(image)
+	if err != nil {
+		return err
+	}
+	if stat.IsDir() {
+		return fmt.Errorf("%v is not a image", image)
+	}
+	imageOptim := path.Join("/Applications/ImageOptim.app/Contents/MacOS", "ImageOptim")
+	_, err = os.Stat(imageOptim)
+	if err != nil {
+		return ErrorNotFoundImageOptim
+	}
+	return execute(imageOptim, image)
 }
 
 func gitUpload(cfg ChopperCfg, files []string) (git.Status, error) {
@@ -333,6 +368,22 @@ func export(cfg ChopperCfg, win fyne.Window) {
 			dstFiles = append(dstFiles, path.Join(fileDir, newName))
 		} else {
 			dstFiles = append(dstFiles, path.Join(fileDir, fileName))
+		}
+	}
+
+	for _, image := range dstFiles {
+		ext := path.Ext(image)
+		if ext != ".png" && ext != ".jpg" {
+			continue
+		}
+		err = compressImage(path.Join(cfg.DirPath, image))
+		if err == ErrorNotFoundImageOptim {
+			break
+		}
+		if err != nil {
+			prog.Hide()
+			dialog.NewError(err, win)
+			return
 		}
 	}
 

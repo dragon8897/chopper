@@ -81,7 +81,7 @@ func createCfgUI(cfg *ChopperCfg, win fyne.Window) fyne.CanvasObject {
 	btnDir := &widget.Button{}
 	btnDir.Alignment = widget.ButtonAlignLeading
 	if cfg.DirPath == "" {
-		btnDir.Text = "点击这里输入图片导出的文件夹"
+		btnDir.Text = "点击这里输入资源导出的文件夹"
 	} else {
 		btnDir.Text = cfg.DirPath
 	}
@@ -98,7 +98,7 @@ func createCfgUI(cfg *ChopperCfg, win fyne.Window) fyne.CanvasObject {
 
 	}
 	btnDirRow := fyne.NewContainerWithLayout(layout.NewFormLayout(), []fyne.CanvasObject{
-		widget.NewLabel("图片目录:"),
+		widget.NewLabel("资源目录:"),
 		btnDir,
 	}...)
 
@@ -186,7 +186,7 @@ func chopperScreen(a fyne.App, win fyne.Window) fyne.CanvasObject {
 	chopperPanel = widget.NewVBox(allCanvas...)
 
 	content := []fyne.CanvasObject{
-		widget.NewLabelWithStyle("欢迎使用图片资源命名工具", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("欢迎使用资源命名工具", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
 		chopperPanel,
 		layout.NewSpacer(),
 		widget.NewHBox(
