@@ -135,20 +135,13 @@ func execute(name string, arg ...string) error {
 	return nil
 }
 
-func compressImage(image string) error {
-	stat, err := os.Stat(image)
-	if err != nil {
-		return err
-	}
-	if stat.IsDir() {
-		return fmt.Errorf("%v is not a image", image)
-	}
+func compressImage(images ...string) error {
 	imageOptim := path.Join("/Applications/ImageOptim.app/Contents/MacOS", "ImageOptim")
-	_, err = os.Stat(imageOptim)
+	_, err := os.Stat(imageOptim)
 	if err != nil {
 		return ErrorNotFoundImageOptim
 	}
-	return execute(imageOptim, image)
+	return execute(imageOptim, images...)
 }
 
 func gitUpload(cfg ChopperCfg, files []string) (git.Status, error) {
@@ -371,20 +364,20 @@ func export(cfg ChopperCfg, win fyne.Window) {
 		}
 	}
 
+	var allImages []string
 	for _, image := range dstFiles {
 		ext := path.Ext(image)
 		if ext != ".png" && ext != ".jpg" {
 			continue
 		}
-		err = compressImage(path.Join(cfg.DirPath, image))
-		if err == ErrorNotFoundImageOptim {
-			break
-		}
-		if err != nil {
-			prog.Hide()
-			dialog.NewError(err, win)
-			return
-		}
+		allImages = append(allImages, path.Join(cfg.DirPath, image))
+	}
+
+	err = compressImage(allImages...)
+	if err != ErrorNotFoundImageOptim && err != nil {
+		prog.Hide()
+		dialog.NewError(err, win)
+		return
 	}
 
 	uploaded, err := gitUpload(cfg, dstFiles)
